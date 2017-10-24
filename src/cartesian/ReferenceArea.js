@@ -10,8 +10,9 @@ import Layer from '../container/Layer';
 import Label from '../component/Label';
 import { PRESENTATION_ATTRIBUTES } from '../util/ReactUtils';
 import { isNumOrStr } from '../util/DataUtils';
-import { validateCoordinateInRange } from '../util/ChartUtils';
+import { getValueByDataKey, validateCoordinateInRange } from '../util/ChartUtils';
 import Rectangle from '../shape/Rectangle';
+import Polygon from '../shape/Polygon';
 
 @pureRender
 class ReferenceArea extends Component {
@@ -103,6 +104,21 @@ class ReferenceArea extends Component {
     return null;
   }
 
+  getPolygon() {
+    const { data, xAxis, yAxis } = this.props;
+    const xAxisDataKey = xAxis.dataKey || 'x';
+    const yAxisDataKey = yAxis.dataKey || 'y';
+    const xScale = xAxis.scale;
+    const yScale = yAxis.scale;
+    const xOffset = xScale.bandwidth ? xScale.bandwidth() / 2 : 0;
+    const yOffset = yScale.bandwidth ? yScale.bandwidth() / 2 : 0;
+
+    return data.map(datum => ({
+      x: xScale(getValueByDataKey(datum, xAxisDataKey)) + xOffset,
+      y: yScale(getValueByDataKey(datum, yAxisDataKey)) + yOffset,
+    }));
+  }
+
   renderRect(option, props) {
     let rect;
 
@@ -122,8 +138,26 @@ class ReferenceArea extends Component {
     return rect;
   }
 
+  renderPolygon(option, props) {
+    let polygon;
+
+    if (React.isValidElement(option)) {
+      polygon = React.cloneElement(option, props);
+    } else if (_.isFunction(option)) {
+      polygon = option(props);
+    } else {
+      polygon = (
+        <Polygon
+          {...props}
+          className="recharts-reference-area-rect"
+        />
+      );
+    }
+    return polygon;
+  }
+
   render() {
-    const { x1, x2, y1, y2, className } = this.props;
+    const { x1, x2, y1, y2, data, className } = this.props;
 
     const hasX1 = isNumOrStr(x1);
     const hasX2 = isNumOrStr(x2);
@@ -132,18 +166,25 @@ class ReferenceArea extends Component {
     const hasX = hasX1 && hasX2;
     const hasY = hasY1 && hasY2;
 
-    if (!hasX1 && !hasX2 && !hasY1 && !hasY2) { return null; }
+    let area;
+    if (data) {
+      const points = this.getPolygon();
+      const { shape } = this.props;
+      area = this.renderPolygon(shape, { ...this.props, points });
+    } else {
+      if (!hasX1 && !hasX2 && !hasY1 && !hasY2) { return null; }
 
-    const rect = this.getRect(hasX1, hasX2, hasY1, hasY2);
+      const rect = this.getRect(hasX1, hasX2, hasY1, hasY2);
+      if (!rect) { return null; }
 
-    if (!rect) { return null; }
-
-    const { shape } = this.props;
+      const { shape } = this.props;
+      area = this.renderRect(shape, { ...this.props, ...rect });
+    }
 
     return (
       <Layer className={classNames('recharts-reference-area', className)}>
-        {this.renderRect(shape, { ...this.props, ...rect })}
-        {Label.renderCallByParent(this.props, rect)}
+        {area}
+        {Label.renderCallByParent(this.props, Label.parseViewBox(area.props))}
       </Layer>
     );
   }
