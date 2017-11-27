@@ -163,8 +163,6 @@ class ReferenceArea extends Component {
     const hasX2 = isNumOrStr(x2);
     const hasY1 = isNumOrStr(y1);
     const hasY2 = isNumOrStr(y2);
-    const hasX = hasX1 && hasX2;
-    const hasY = hasY1 && hasY2;
 
     let area;
     if (data) {

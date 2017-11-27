@@ -13,7 +13,7 @@ import Cell from '../component/Cell';
 import LabelList from '../component/LabelList';
 import pureRender from '../util/PureRender';
 import { uniqueId, mathSign, interpolateNumber } from '../util/DataUtils';
-import { PRESENTATION_ATTRIBUTES, EVENT_ATTRIBUTES, LEGEND_TYPES, findChildByType,
+import { PRESENTATION_ATTRIBUTES, EVENT_ATTRIBUTES, LEGEND_TYPES,
   findAllByType, getPresentationAttributes, filterEventsOfChild, isSsr } from '../util/ReactUtils';
 import { getCateCoordinateOfBar, getValueByDataKey, truncateByDomain, getBaseValueOfBar,
   findPositionOfBar } from '../util/ChartUtils';
@@ -226,7 +226,8 @@ class Bar extends Component {
 
   renderRectanglesWithAnimation() {
     const { data, layout, isAnimationActive, animationBegin,
-      animationDuration, animationEasing, animationId } = this.props;
+      animationDuration, animationEasing, animationId, width,
+    } = this.props;
     const { prevData } = this.state;
 
     return (
@@ -262,10 +263,17 @@ class Bar extends Component {
               }
 
               if (layout === 'horizontal') {
-                const interpolator = interpolateNumber(0, entry.height);
-                const h = interpolator(t);
+                // magic number of faking previous x location
+                const interpolatorX = interpolateNumber(width * 2, entry.x);
+                const interpolatorHeight = interpolateNumber(0, entry.height);
+                const h = interpolatorHeight(t);
 
-                return { ...entry, y: entry.y + entry.height - h, height: h };
+                return {
+                  ...entry,
+                  x: interpolatorX(t),
+                  y: entry.y + entry.height - h,
+                  height: h,
+                };
               }
 
               const interpolator = interpolateNumber(0, entry.width);
@@ -301,9 +309,9 @@ class Bar extends Component {
     if (this.props.isAnimationActive && !this.state.isAnimationFinished) { return null; }
 
     const { data, xAxis, yAxis, layout, children } = this.props;
-    const errorBarItem = findChildByType(children, ErrorBar);
+    const errorBarItems = findAllByType(children, ErrorBar);
 
-    if (!errorBarItem) { return null; }
+    if (!errorBarItems) { return null; }
 
     const offset = (layout === 'vertical') ? data[0].height / 2 : data[0].width / 2;
 
@@ -316,14 +324,15 @@ class Bar extends Component {
       };
     }
 
-    return React.cloneElement(errorBarItem, {
+    return errorBarItems.map((item, i) => React.cloneElement(item, {
+      key: i,
       data,
       xAxis,
       yAxis,
       layout,
       offset,
       dataPointFormatter,
-    });
+    }));
   }
 
   render() {
